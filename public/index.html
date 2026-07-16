@@ -1,16 +1,16 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>中国アクセスチェック</title>
+<title>中国大陆访问检测 · GFW Access Check</title>
 <style>
   :root{
     --paper:#F5F6F8; --surface:#FFFFFF; --ink:#14181F; --muted:#5B6472;
     --line:#E4E7EC; --accent:#2749C9; --accent-soft:#EAEEFB;
     --ok:#1F9254; --ok-soft:#E7F3EC; --block:#C8321F; --block-soft:#FBEAE7;
     --warn:#B26A00; --warn-soft:#FBF1E1;
-    --font-sans: system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic","Noto Sans JP",Meiryo,sans-serif;
+    --font-sans: system-ui,-apple-system,"Segoe UI",Roboto,"Hiragino Sans","Noto Sans CJK SC","Microsoft YaHei",sans-serif;
     --font-mono: ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box}
@@ -21,8 +21,11 @@
   }
   .wrap{max-width:900px; margin:0 auto; padding:48px 20px 80px}
 
-  header.top{margin-bottom:24px}
-  h1{font-size:26px; margin:0; letter-spacing:-.01em}
+  header.top{margin-bottom:28px}
+  .kicker{font-size:12px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--accent); font-weight:600; margin-bottom:8px}
+  h1{font-size:28px; margin:0 0 6px; letter-spacing:-.01em}
+  .sub{color:var(--muted); font-size:15px; margin:0}
 
   .panel{background:var(--surface); border:1px solid var(--line);
     border-radius:14px; padding:22px}
@@ -40,12 +43,39 @@
   button.go:hover{background:#1d3aa8}
   button.go:disabled{opacity:.55; cursor:default}
 
+  .presets{display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; align-items:center}
+  .presets .lbl{font-size:12px; color:var(--muted); margin-right:2px}
+  .chip{border:1px solid var(--line); background:var(--surface); border-radius:999px;
+    padding:5px 12px; font-size:13px; cursor:pointer; color:var(--ink);
+    font-family:var(--font-mono)}
+  .chip:hover{border-color:var(--accent); color:var(--accent)}
+  .chip.empty{color:var(--muted); cursor:help; opacity:.7}
+
+  .modeline{display:flex; align-items:center; gap:8px; margin-top:16px;
+    font-size:13px; color:var(--muted)}
+  .switch{position:relative; width:38px; height:22px; flex:0 0 auto}
+  .switch input{opacity:0; width:0; height:0}
+  .track{position:absolute; inset:0; background:var(--line); border-radius:999px;
+    transition:background .15s}
+  .track::before{content:""; position:absolute; left:3px; top:3px; width:16px; height:16px;
+    background:#fff; border-radius:50%; transition:transform .15s}
+  .switch input:checked + .track{background:var(--accent)}
+  .switch input:checked + .track::before{transform:translateX(16px)}
+
+  /* results */
   .results{margin-top:26px}
   .results[hidden]{display:none}
-
-  .banner{font-size:13px; color:var(--block); background:var(--block-soft);
-    border:1px solid #F0CDC7; border-radius:8px; padding:10px 12px; margin-bottom:16px}
-  .banner[hidden]{display:none}
+  .verdict{display:flex; align-items:center; gap:14px; padding:18px 20px;
+    border-radius:14px; border:1px solid var(--line); margin-bottom:20px}
+  .verdict .dot{width:12px; height:12px; border-radius:50%; flex:0 0 auto}
+  .verdict h2{margin:0; font-size:18px}
+  .verdict p{margin:2px 0 0; font-size:14px; color:var(--muted)}
+  .verdict.ok{background:var(--ok-soft); border-color:#C9E4D4}
+  .verdict.ok .dot{background:var(--ok)}
+  .verdict.block{background:var(--block-soft); border-color:#F0CDC7}
+  .verdict.block .dot{background:var(--block)}
+  .verdict.warn{background:var(--warn-soft); border-color:#EFDBB4}
+  .verdict.warn .dot{background:var(--warn)}
 
   .meta{display:flex; gap:24px; flex-wrap:wrap; font-size:13px; color:var(--muted);
     margin:0 4px 16px; font-family:var(--font-mono)}
@@ -53,18 +83,27 @@
 
   .nodes{display:grid; grid-template-columns:repeat(5,1fr); gap:12px}
   @media(max-width:720px){.nodes{grid-template-columns:repeat(2,1fr)}}
-  .node{border:1px solid var(--line); border-radius:12px; padding:16px 14px;
-    background:var(--surface); text-align:center;
+  .node{border:1px solid var(--line); border-radius:12px; padding:14px;
+    background:var(--surface);
     opacity:0; transform:translateY(6px);
     transition:opacity .28s ease, transform .28s ease;
     transition-delay:calc(var(--i)*70ms)}
   .node.in{opacity:1; transform:none}
-  .node .loc{font-weight:600; font-size:14px}
-  .node .tag{font-size:26px; font-weight:800; margin-top:10px; letter-spacing:.02em}
+  .node .loc{display:flex; align-items:center; gap:7px; font-weight:600; font-size:14px}
+  .node .sd{width:9px; height:9px; border-radius:50%; flex:0 0 auto; background:var(--muted)}
+  .node.ok .sd{background:var(--ok)} .node.block .sd{background:var(--block)}
+  .node.warn .sd{background:var(--warn)}
+  .node .ip{font-family:var(--font-mono); font-size:12.5px; color:var(--ink);
+    margin-top:10px; word-break:break-all; min-height:18px}
+  .node .tag{font-size:11px; margin-top:8px; font-weight:600; letter-spacing:.02em}
   .node.ok .tag{color:var(--ok)} .node.block .tag{color:var(--block)}
   .node.warn .tag{color:var(--warn)}
-  .node .ip{font-family:var(--font-mono); font-size:12px; color:var(--muted);
-    margin-top:10px; word-break:break-all; min-height:16px}
+
+  .note{margin-top:22px; font-size:12.5px; color:var(--muted); line-height:1.65;
+    border-top:1px solid var(--line); padding-top:16px}
+  .banner{font-size:12.5px; color:var(--warn); background:var(--warn-soft);
+    border:1px solid #EFDBB4; border-radius:8px; padding:8px 12px; margin-bottom:16px}
+  .banner[hidden]{display:none}
 
   @media(prefers-reduced-motion:reduce){
     .node{transition:none; transition-delay:0ms!important; opacity:1; transform:none}
@@ -74,44 +113,81 @@
 <body>
 <div class="wrap">
   <header class="top">
-    <h1>中国アクセスチェック</h1>
+    <div class="kicker">GFW Access Check</div>
+    <h1>中国大陆访问检测</h1>
+    <p class="sub">从中国大陆五个节点实时解析域名，判断网站能否被墙内访问。</p>
   </header>
 
   <div class="panel">
     <div class="querybar">
       <label class="field">
         <span class="glyph">https://</span>
-        <input id="domain" type="text" placeholder="ドメインを入力（例: example.com）" autocomplete="off" spellcheck="false">
+        <input id="domain" type="text" placeholder="输入域名，例如 example.com" autocomplete="off" spellcheck="false">
       </label>
-      <button class="go" id="run">チェック</button>
+      <button class="go" id="run">检测</button>
+    </div>
+
+    <div class="presets" id="presets">
+      <span class="lbl">常用：</span>
+    </div>
+
+    <div class="modeline">
+      <label class="switch">
+        <input type="checkbox" id="demo">
+        <span class="track"></span>
+      </label>
+      <span>演示模式（不请求后端，用示例数据预览界面）</span>
     </div>
   </div>
 
   <section class="results" id="results" hidden>
-    <div class="banner" id="error" hidden></div>
+    <div class="banner" id="fallback" hidden></div>
+    <div class="verdict" id="verdict">
+      <span class="dot"></span>
+      <div><h2 id="vTitle"></h2><p id="vDesc"></p></div>
+    </div>
     <div class="meta">
-      <span>ドメイン <b id="mDomain"></b></span>
-      <span>本来のIP <b id="mExpected"></b></span>
+      <span>域名 <b id="mDomain"></b></span>
+      <span>正确解析 <b id="mExpected"></b></span>
     </div>
     <div class="nodes" id="nodes"></div>
+    <p class="note" id="note"></p>
   </section>
 </div>
 
 <script>
-// 設定
+/* ===== 配置 ===== */
 const CONFIG = {
-  // Cloudflare: '/proxy' / Vercel: '/api/proxy' / PHP: './proxy.php'
+  // Cloudflare Pages / Vercel 用 serverless 函数当代理。
+  //   Cloudflare Pages: '/proxy'   |   Vercel: '/api/proxy'   |   PHP 主机: './proxy.php'
   endpoint: '/proxy',
+  // 你们四个站：把 domain 填成真实域名，chip 就能一键检测
+  presets: [
+    { label: 'gyokko',    domain: '' },
+    { label: 'meiho',     domain: '' },
+    { label: 'ysd',       domain: '' },
+    { label: 'tenpokagu', domain: '' },
+  ],
 };
 
-// ノード地名（英語→日本語）
-const LOC = {
-  'Beijing':'北京', 'Shenzhen':'深セン', 'Inner Mongolia':'内モンゴル',
-  'Heilongjiang Province':'黒竜江', 'Yunnan Province':'雲南',
+const LOC_ZH = {
+  'Beijing':'北京', 'Shenzhen':'深圳', 'Inner Mongolia':'内蒙古',
+  'Heilongjiang Province':'黑龙江', 'Yunnan Province':'云南',
 };
 
 const $ = s => document.querySelector(s);
-const input = $('#domain'), runBtn = $('#run');
+const input = $('#domain'), runBtn = $('#run'), demo = $('#demo');
+
+/* preset chips */
+const pWrap = $('#presets');
+CONFIG.presets.forEach(p => {
+  const c = document.createElement('button');
+  c.className = 'chip' + (p.domain ? '' : ' empty');
+  c.textContent = p.label;
+  if (p.domain) { c.onclick = () => { input.value = p.domain; runTest(); }; }
+  else { c.title = '在 index.html 顶部 CONFIG.presets 里填入真实域名'; }
+  pWrap.appendChild(c);
+});
 
 function cleanDomain(v){
   return (v||'').trim().replace(/^https?:\/\//i,'').replace(/\/.*$/,'').replace(/[^a-zA-Z0-9.\-]/g,'');
@@ -124,50 +200,89 @@ async function runTest(){
   const domain = cleanDomain(input.value);
   if(!domain){ input.focus(); return; }
   input.value = domain;
-  runBtn.disabled = true; runBtn.textContent = 'チェック中…';
+  runBtn.disabled = true; runBtn.textContent = '检测中…';
+
   try{
+    if(demo.checked){ render(demoData(domain), '演示数据（演示模式已开启）'); return; }
     const r = await fetch(`${CONFIG.endpoint}?domain=${encodeURIComponent(domain)}`);
     if(!r.ok) throw new Error('HTTP '+r.status);
     const data = await r.json();
     if(data.error) throw new Error(data.error);
-    render(data);
+    render(data, null);
   }catch(e){
-    showError('エラー: ' + e.message);
+    render(demoData(domain), '演示数据（未连接到后端：'+e.message+'）。部署 proxy.php 并填入 API key 后即为实时结果。');
   }finally{
-    runBtn.disabled = false; runBtn.textContent = 'チェック';
+    runBtn.disabled = false; runBtn.textContent = '检测';
   }
 }
 
-function showError(msg){
-  $('#error').textContent = msg; $('#error').hidden = false;
-  $('#nodes').innerHTML = '';
-  $('#mDomain').textContent = '—'; $('#mExpected').textContent = '—';
-  $('#results').hidden = false;
+function classify(summaryResult){
+  const r = (summaryResult||'').toLowerCase();
+  if(r==='visible' || r==='ok') return {c:'ok',  t:'可从中国大陆访问'};
+  if(r==='blocked'|| r==='censored') return {c:'block', t:'被防火长城屏蔽'};
+  return {c:'warn', t:'部分节点无法访问'};
 }
 
-function render(data){
-  $('#error').hidden = true;
+function render(data, fallbackMsg){
+  const v = classify(data.summary && data.summary.result);
+  $('#verdict').className = 'verdict ' + v.c;
+  $('#vTitle').textContent = v.t;
+  $('#vDesc').textContent = (data.summary && data.summary.description) || '';
   $('#mDomain').textContent = data.domain || '—';
   $('#mExpected').textContent = data.expected || '—';
+
+  const fb = $('#fallback');
+  if(fallbackMsg){ fb.textContent = fallbackMsg; fb.hidden = false; }
+  else fb.hidden = true;
 
   const box = $('#nodes'); box.innerHTML = '';
   (data.nodes||[]).forEach((n,i) => {
     const ok = n.status==='ok';
-    const cls = ok ? 'ok' : (n.status==='error' ? 'block' : 'warn');
-    const tag = ok ? '正常' : (n.status==='error' ? '失敗' : '異常');
+    const cls = !ok ? 'block' : (n.match===false ? 'warn' : 'ok');
+    const tag = !ok ? (n.status==='error'?'解析失败':'不可达')
+              : (n.match===false ? '解析异常' : '正常');
     const el = document.createElement('div');
     el.className = 'node ' + cls;
     el.style.setProperty('--i', i);
-    el.innerHTML =
-      '<div class="loc">' + (LOC[n.location]||n.location) + '</div>' +
-      '<div class="tag">' + tag + '</div>' +
-      '<div class="ip">' + (n.ips || '—') + '</div>';
+    el.innerHTML = `
+      <div class="loc"><span class="sd"></span>${LOC_ZH[n.location]||n.location}</div>
+      <div class="ip">${n.ips || '—'}</div>
+      <div class="tag">${tag}</div>`;
     box.appendChild(el);
     requestAnimationFrame(()=> requestAnimationFrame(()=> el.classList.add('in')));
   });
 
+  $('#note').textContent =
+    '检测原理：从中国大陆五地节点解析该域名，与墙外的正确解析结果比对。'+
+    '某节点返回异常 IP 或解析失败，通常意味着该地存在 DNS 污染或屏蔽。'+
+    '此方法主要反映 DNS 层情况，IP 封锁、SNI 阻断或链路质量问题可能不会体现，'+
+    '需要更精确的判断时建议结合国内多节点 HTTP 实测。';
+
   $('#results').hidden = false;
   $('#results').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+/* ===== 演示数据（无后端时用，模拟真实响应结构）===== */
+function demoData(domain){
+  const blocked = ['google','youtube','facebook','twitter','x.com','instagram',
+    'wikipedia','telegram','whatsapp','nytimes','bbc','reddit','pornhub'];
+  const isBlocked = blocked.some(k => domain.includes(k));
+  const locs = ['Beijing','Shenzhen','Inner Mongolia','Heilongjiang Province','Yunnan Province'];
+  if(isBlocked){
+    const fakes = ['59.24.3.173','243.185.187.39','203.98.7.65','8.7.198.45',''];
+    return {
+      domain, expected:'142.250.72.14',
+      summary:{ result:'blocked', description:'多个节点解析到异常地址，疑似 DNS 污染。' },
+      nodes: locs.map((l,i)=>({ location:l, ips:fakes[i],
+        status: fakes[i]===''?'error':'ok', match:false })),
+    };
+  }
+  const exp = '104.18.42.197 172.64.145.59';
+  return {
+    domain, expected:exp,
+    summary:{ result:'visible', description:'所有节点均解析到正确地址。' },
+    nodes: locs.map(l=>({ location:l, ips:exp, status:'ok', match:true })),
+  };
 }
 </script>
 </body>
